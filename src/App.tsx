@@ -11,11 +11,11 @@ import {
   Operation,
   Asset,
   Networks,
-  SorobanRpc,
   Contract,
   Memo,
   xdr,
 } from "stellar-sdk";
+import { Server as RpcServer } from "stellar-sdk/rpc";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 const RPC_URL = "https://soroban-testnet.stellar.org";
@@ -23,7 +23,7 @@ const CONTRACT_ID =
   "CAIXY7P7RF5J2TTAI6BV4IUKAFXKJPUE2VSMM5F5IRHV7ARJ73JAAGSM";
 
 const server = new Horizon.Server(HORIZON_URL);
-const rpc = new SorobanRpc.Server(RPC_URL);
+const rpc = new RpcServer(RPC_URL);
 
 type TxStatus = "idle" | "pending" | "success" | "fail";
 
