@@ -120,18 +120,15 @@ function App() {
       const acct = await server.loadAccount(address);
       const contract = new Contract(CONTRACT_ID);
 
-      const txBuilder = new TransactionBuilder(acct, {
+      const tx = new TransactionBuilder(acct, {
         fee: "100000",
         networkPassphrase: Networks.TESTNET,
-      });
-
-      const tx = txBuilder
+      })
         .addOperation(contract.call("hello", greetingInput || "Dev"))
         .setTimeout(300)
         .build();
 
-      const sim = await rpc.simulateTransaction(tx);
-      const prepared = rpc.prepareTransaction(tx, sim);
+      const prepared = await rpc.prepareTransaction(tx);
 
       const { signedTxXdr } = await signTransaction(
         prepared.toEnvelope().toXDR("base64"),
@@ -163,16 +160,8 @@ function App() {
 
       if (msg.includes("rejected") || msg.includes("denied")) {
         setError("Error: Transaction rejected by user in wallet.");
-      } else if (
-        msg.includes("balance") ||
-        msg.includes("underfunded") ||
-        msg.includes("insufficient")
-      ) {
-        setError("Error: Insufficient balance to complete the transaction. Fund your wallet first.");
-      } else if (msg.includes("not found") || msg.includes("undefined")) {
-        setError("Error: Wallet not found. Please reconnect your wallet.");
       } else {
-        setError(`Error: ${msg || "Contract call failed. Please try again."}`);
+        setError(`Error: ${msg || "Contract call failed"}`);
       }
     }
   };
