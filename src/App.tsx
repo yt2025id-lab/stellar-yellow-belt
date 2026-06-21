@@ -124,7 +124,9 @@ function App() {
         fee: "100000",
         networkPassphrase: Networks.TESTNET,
       })
-        .addOperation(contract.call("hello", greetingInput || "Dev"))
+        .addOperation(
+          contract.call("hello", xdr.ScVal.scvString(greetingInput || "Dev"))
+        )
         .setTimeout(300)
         .build();
 
