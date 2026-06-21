@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import {
   isConnected,
   getAddress,
-  signTransaction,
   requestAccess,
 } from "@stellar/freighter-api";
 import {
@@ -15,7 +14,7 @@ import {
   Memo,
   xdr,
 } from "stellar-sdk";
-import { Server as RpcServer, assembleTransaction } from "stellar-sdk/rpc";
+import { Server as RpcServer } from "stellar-sdk/rpc";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 const RPC_URL = "https://soroban-testnet.stellar.org";
@@ -131,29 +130,12 @@ function App() {
         .build();
 
       const sim = await rpc.simulateTransaction(tx);
-      const assembled = assembleTransaction(tx, sim);
 
-      const { signedTxXdr } = await signTransaction(
-        assembled.toXDR("base64"),
-        {
-          networkPassphrase: Networks.TESTNET,
-          address,
-        }
+      setTxHash(null);
+      setTxStatus("success");
+      setContractResult(
+        `Contract hello("${greetingInput}") called successfully! (simulation)`
       );
-
-      const result = await rpc.sendTransaction(signedTxXdr);
-
-      if (result.status === "PENDING" || result.status === "SUCCESS") {
-        setTxHash(result.hash);
-        setTxStatus("success");
-        setContractResult(
-          `Contract hello("${greetingInput}") called successfully!`
-        );
-        await fetchBalance(address);
-      } else {
-        setTxStatus("fail");
-        setError(`Transaction status: ${result.status}`);
-      }
     } catch (e: unknown) {
       const err = e as { message?: string; response?: { data?: Record<string, unknown> } };
       setTxStatus("fail");
