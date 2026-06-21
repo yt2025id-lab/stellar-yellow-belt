@@ -229,15 +229,15 @@ function App() {
             <div className="wallet-options">
               {wallets.map((w) => (
                 <button
-                  key={w.id}
-                  className={`btn btn-wallet ${!w.available ? "btn-disabled" : ""}`}
-                  onClick={() => connectWallet(w.id)}
-                  disabled={!w.available}
-                >
-                  <span className="btn-text">
-                    {w.icon} {w.name}
-                  </span>
-                </button>
+                key={w.id}
+                className={`btn ${w.id === "freighter" ? "btn-primary" : "btn-wallet"} ${!w.available ? "btn-disabled" : ""}`}
+                onClick={() => connectWallet(w.id)}
+                disabled={!w.available}
+              >
+                <span className="btn-text">
+                  {w.icon} {w.name}
+                </span>
+              </button>
               ))}
             </div>
             <p className="wallet-hint">Click a wallet to connect (Freighter recommended)</p>
