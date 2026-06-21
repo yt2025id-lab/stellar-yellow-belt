@@ -140,8 +140,7 @@ function App() {
         }
       );
 
-      const txEnvelope = xdr.TransactionEnvelope.fromXDR(signedTxXdr, "base64");
-      const result = await rpc.sendTransaction(txEnvelope);
+      const result = await rpc.sendTransaction(signedTxXdr);
 
       if (result.status === "PENDING" || result.status === "SUCCESS") {
         setTxHash(result.hash);
