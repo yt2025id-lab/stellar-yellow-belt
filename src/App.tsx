@@ -130,15 +130,19 @@ function App() {
         .setTimeout(300)
         .build();
 
-      const prepared = await rpc.prepareTransaction(tx);
+      const txXdr = tx.toXDR("base64");
 
-      const { signedTxXdr } = await signTransaction(
-        prepared.toXDR("base64"),
+      const { signedTxXdr, error: signError } = await signTransaction(
+        txXdr,
         {
           networkPassphrase: Networks.TESTNET,
           address,
         }
       );
+
+      if (signError || !signedTxXdr) {
+        throw new Error(String(signError || "Signing failed"));
+      }
 
       const result = await rpc.sendTransaction(signedTxXdr);
 
