@@ -134,7 +134,7 @@ function App() {
       const assembled = assembleTransaction(tx, sim);
 
       const { signedTxXdr } = await signTransaction(
-        assembled.toEnvelope().toXDR("base64"),
+        assembled.toXDR("base64"),
         {
           networkPassphrase: Networks.TESTNET,
           address,
