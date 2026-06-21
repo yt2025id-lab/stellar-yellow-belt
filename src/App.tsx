@@ -126,18 +126,23 @@ function App() {
       });
 
       const tx = txBuilder
-        .addOperation(contract.call("hello", { to: greetingInput }))
+        .addOperation(contract.call("hello", greetingInput || "Dev"))
         .setTimeout(300)
         .build();
 
-      const txXdr = tx.toEnvelope().toXDR("base64");
+      const sim = await rpc.simulateTransaction(tx);
+      const prepared = rpc.prepareTransaction(tx, sim);
 
-      const { signedTxXdr } = await signTransaction(txXdr, {
-        networkPassphrase: Networks.TESTNET,
-        address,
-      });
+      const { signedTxXdr } = await signTransaction(
+        prepared.toEnvelope().toXDR("base64"),
+        {
+          networkPassphrase: Networks.TESTNET,
+          address,
+        }
+      );
 
-      const result = await rpc.sendTransaction(signedTxXdr);
+      const txEnvelope = xdr.TransactionEnvelope.fromXDR(signedTxXdr, "base64");
+      const result = await rpc.sendTransaction(txEnvelope);
 
       if (result.status === "PENDING" || result.status === "SUCCESS") {
         setTxHash(result.hash);
