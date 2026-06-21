@@ -15,7 +15,7 @@ import {
   Memo,
   xdr,
 } from "stellar-sdk";
-import { Server as RpcServer } from "stellar-sdk/rpc";
+import { Server as RpcServer, assembleTransaction } from "stellar-sdk/rpc";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 const RPC_URL = "https://soroban-testnet.stellar.org";
@@ -130,10 +130,11 @@ function App() {
         .setTimeout(300)
         .build();
 
-      const prepared = await rpc.prepareTransaction(tx);
+      const sim = await rpc.simulateTransaction(tx);
+      const assembled = assembleTransaction(tx, sim);
 
       const { signedTxXdr } = await signTransaction(
-        prepared.toEnvelope().toXDR("base64"),
+        assembled.toEnvelope().toXDR("base64"),
         {
           networkPassphrase: Networks.TESTNET,
           address,
