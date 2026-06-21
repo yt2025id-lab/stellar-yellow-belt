@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   isConnected,
   getAddress,
+  signTransaction,
   requestAccess,
 } from "@stellar/freighter-api";
 import {
@@ -129,13 +130,24 @@ function App() {
         .setTimeout(300)
         .build();
 
-      const sim = await rpc.simulateTransaction(tx);
+      const prepared = await rpc.prepareTransaction(tx);
 
-      setTxHash(null);
+      const { signedTxXdr } = await signTransaction(
+        prepared.toXDR("base64"),
+        {
+          networkPassphrase: Networks.TESTNET,
+          address,
+        }
+      );
+
+      const result = await rpc.sendTransaction(signedTxXdr);
+
+      setTxHash(result.hash);
       setTxStatus("success");
       setContractResult(
-        `Contract hello("${greetingInput}") called successfully! (simulation)`
+        `Contract hello("${greetingInput}") called successfully!`
       );
+      await fetchBalance(address);
     } catch (e: unknown) {
       const err = e as { message?: string; response?: { data?: Record<string, unknown> } };
       setTxStatus("fail");
