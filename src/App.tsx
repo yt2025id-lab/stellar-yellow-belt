@@ -124,6 +124,7 @@ function App() {
   const [liveUpdated, setLiveUpdated] = useState(false);
   const [view, setView] = useState<"landing" | "app">("landing");
   const [showWalletModal, setShowWalletModal] = useState(false);
+  const [showVoting, setShowVoting] = useState(false);
 
   const lastLedgerRef = useRef<number>(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -375,6 +376,7 @@ function App() {
     setTxHash(null);
     setError(null);
     setSuccessMsg(null);
+    setShowVoting(false);
   };
 
   // ============ CREATE POLL ============
@@ -862,8 +864,50 @@ function App() {
           </section>
         )}
 
-        {!pollLoading && pollExists && pollData && (
-          <section className="card poll-card">
+        {!pollLoading && pollExists && pollData && !showVoting && (
+          <section className="card card-full poll-summary">
+            <div className="poll-summary-header">
+              <div className="poll-live-badge">
+                <span className="poll-live-dot" />
+                Active Poll
+              </div>
+              <h2 className="poll-question-title">{pollData.question}</h2>
+            </div>
+
+            <div className="poll-summary-stats">
+              <div className="poll-stat">
+                <span className="poll-stat-value">{pollData.total}</span>
+                <span className="poll-stat-label">Total Votes</span>
+              </div>
+              <div className="poll-stat">
+                <span className="poll-stat-value">{pollData.options.length}</span>
+                <span className="poll-stat-label">Options</span>
+              </div>
+            </div>
+
+            {address ? (
+              <button
+                className="btn btn-primary btn-full"
+                onClick={() => setShowVoting(true)}
+              >
+                Vote Now
+              </button>
+            ) : (
+              <p className="info-hint">Connect wallet to vote</p>
+            )}
+          </section>
+        )}
+
+        {!pollLoading && pollExists && pollData && showVoting && (
+          <>
+            <button
+              className="btn-back btn-back-poll"
+              onClick={() => setShowVoting(false)}
+            >
+              &larr; Back to Poll
+            </button>
+
+            <section className="card poll-card">
             <div className="poll-header">
               <h2 className="card-title">{pollData.question}</h2>
               <div className="live-indicator">
@@ -926,6 +970,7 @@ function App() {
               <p className="info-hint">Connect wallet above to vote</p>
             )}
           </section>
+          </>
         )}
 
         {(txStatus !== "idle" || error || successMsg || txHash) && (
