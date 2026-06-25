@@ -14,7 +14,6 @@ import {
   Keypair,
   Operation,
   Address,
-  Account,
 } from "stellar-sdk";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
@@ -38,11 +37,12 @@ const appKeypair = getAppKeypair();
 const ALICE_PUBKEY = "GC4ZDZ5R5EKUKF5DY4KZ5PCZDYXRST2WUG2GYHCYMOEP7MDCN5FDN5TJ";
 
 async function simulateRead(contractId: string, method: string, args: xdr.ScVal[] = []) {
+  const acct = await server.loadAccount(ALICE_PUBKEY);
   const contract = new Contract(contractId);
-  const tx = new TransactionBuilder(
-    new Account(ALICE_PUBKEY, "0"),
-    { fee: "100000", networkPassphrase: Networks.TESTNET }
-  )
+  const tx = new TransactionBuilder(acct, {
+    fee: "100000",
+    networkPassphrase: Networks.TESTNET,
+  })
     .addOperation(contract.call(method, ...args))
     .setTimeout(300)
     .build();
@@ -84,9 +84,8 @@ async function rpcCall(method: string, params: Record<string, unknown>) {
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
   });
   const d = await r.json();
-  if (d.error) {
-    throw new Error(`RPC ${method}: ${d.error.message ?? JSON.stringify(d.error)}`);
-  }
+  if (d.error) throw new Error(`RPC ${method}: ${d.error.message ?? JSON.stringify(d.error)}`);
+  if (d.result?.error) throw new Error(String(d.result.error));
   return d.result;
 }
 
