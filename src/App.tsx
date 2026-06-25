@@ -35,10 +35,12 @@ function getAppKeypair(): Keypair {
 
 const appKeypair = getAppKeypair();
 
+const ALICE_PUBKEY = "GC4ZDZ5R5EKUKF5DY4KZ5PCZDYXRST2WUG2GYHCYMOEP7MDCN5FDN5TJ";
+
 async function simulateRead(contractId: string, method: string, args: xdr.ScVal[] = []) {
   const contract = new Contract(contractId);
   const tx = new TransactionBuilder(
-    new Account(appKeypair.publicKey(), "0"),
+    new Account(ALICE_PUBKEY, "0"),
     { fee: "100000", networkPassphrase: Networks.TESTNET }
   )
     .addOperation(contract.call(method, ...args))
