@@ -24,7 +24,31 @@ Built for **Stellar Journey to Mastery — Yellow Belt (Level 2)**.
 | SDK | `@stellar/freighter-api` v6, `stellar-sdk` v13 |
 | Contract | Soroban Rust Smart Contract |
 
+## Project Structure
+
+```
+stellar-yellow-belt/
+├── contracts/                   # Smart Contract (Soroban Rust)
+│   └── hello-world/
+│       ├── Cargo.toml
+│       ├── Makefile
+│       ├── src/
+│       │   ├── lib.rs           # Contract logic: hello()
+│       │   └── test.rs          # Unit test
+│       └── test_snapshots/
+├── Cargo.toml                   # Rust workspace root
+├── src/                         # Frontend (React + TypeScript)
+│   ├── App.tsx
+│   ├── main.tsx
+│   └── index.css
+├── package.json
+├── vite.config.ts
+└── README.md
+```
+
 ## Setup Instructions
+
+### Frontend
 
 ```bash
 npm install
@@ -33,12 +57,29 @@ npm run dev
 
 Open `http://localhost:5173` in your browser.
 
+### Smart Contract — Local Build & Test
+
+```bash
+cd contracts/hello-world
+make build    # Build WASM binary
+make test     # Run unit tests
+```
+
+**Test Output:**
+```
+running 1 test
+test test::test ... ok
+test result: ok. 1 passed; 0 failed
+```
+
 ### Prerequisites
 
 1. **Node.js** v18+
-2. **Freighter Wallet** — [install here](https://www.freighter.app/)
-3. **Albedo Wallet** — [install here](https://albedo.link/) (optional)
-4. Funded Stellar Testnet account
+2. **Rust** — [install via rustup](https://rustup.rs/)
+3. **Stellar CLI** — `cargo install stellar-cli --features opt`
+4. **Freighter Wallet** — [install here](https://www.freighter.app/)
+5. **Albedo Wallet** — [install here](https://albedo.link/) (optional)
+6. Funded Stellar Testnet account
 
 ## Deployed Contract
 
@@ -78,6 +119,8 @@ Open `http://localhost:5173` in your browser.
 
 - [x] 3 error types handled
 - [x] Contract deployed on testnet
+- [x] Contract source in `contracts/` folder (lib.rs + test.rs + Cargo.toml)
+- [x] Local test passing (`cargo test`)
 - [x] Contract called from frontend
 - [x] Transaction status visible (Ready/Pending/Success/Fail)
 - [x] 2+ meaningful commits
