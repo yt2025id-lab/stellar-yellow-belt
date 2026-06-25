@@ -34,30 +34,34 @@ function getAppKeypair(): Keypair {
 
 const appKeypair = getAppKeypair();
 
-const ALICE_PUBKEY = "GC4ZDZ5R5EKUKF5DY4KZ5PCZDYXRST2WUG2GYHCYMOEP7MDCN5FDN5TJ";
+const SIM_SOURCE = "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H";
 
 async function simulateRead(contractId: string, method: string, args: xdr.ScVal[] = []) {
-  const acct = await server.loadAccount(ALICE_PUBKEY);
   const contract = new Contract(contractId);
-  const tx = new TransactionBuilder(acct, {
-    fee: "100000",
+  const mockAcct = {
+    accountId: () => SIM_SOURCE,
+    sequenceNumber: () => "0",
+    incrementSequenceNumber: () => {},
+  };
+  const tx = new TransactionBuilder(mockAcct as never, {
+    fee: "100",
     networkPassphrase: Networks.TESTNET,
   })
     .addOperation(contract.call(method, ...args))
     .setTimeout(300)
     .build();
 
-  const sim = await rpcCall("simulateTransaction", {
+  const result = await rpcCall("simulateTransaction", {
     transaction: tx.toXDR(),
   }) as unknown as SimulateResult;
-  return sim;
+  return result;
 }
 
 type TxStatus = "idle" | "pending" | "success" | "fail";
 
 interface SimulateHostFnResult {
   auth: string[];
-  retval: string;
+  xdr: string;
 }
 
 interface SimulateResult {
@@ -150,17 +154,18 @@ function App() {
   const checkPoll = useCallback(async () => {
     try {
       const sim = await simulateRead(contractId, "get_question");
-      if (sim.results?.[0]?.retval) {
-        const questionScVal = xdr.ScVal.fromXDR(sim.results[0].retval, "base64");
+      if (sim.results?.[0]?.xdr) {
+        const questionScVal = xdr.ScVal.fromXDR(sim.results[0].xdr, "base64");
         const question = questionScVal.str()?.toString() ?? "";
         if (question) {
           setPollExists(true);
+          setPollLoading(false);
           await loadFullPoll();
           return;
         }
       }
-    } catch {
-      // poll not initialized
+    } catch (e) {
+      console.error("checkPoll error:", e);
     }
     setPollExists(false);
     setPollLoading(false);
@@ -170,7 +175,7 @@ function App() {
     try {
       const simQ = await simulateRead(contractId, "get_question");
       const question =
-        xdr.ScVal.fromXDR(simQ.results?.[0]?.retval ?? "", "base64").str()?.toString() ?? "";
+        xdr.ScVal.fromXDR(simQ.results?.[0]?.xdr ?? "", "base64").str()?.toString() ?? "";
 
       const options: string[] = [];
       const votes: number[] = [];
@@ -179,11 +184,11 @@ function App() {
       for (let i = 0; i < 6; i++) {
         const simOpt = await simulateRead(contractId, "get_option", [xdr.ScVal.scvU32(i)]);
         options.push(
-          xdr.ScVal.fromXDR(simOpt.results?.[0]?.retval ?? "", "base64").str()?.toString() ?? ""
+          xdr.ScVal.fromXDR(simOpt.results?.[0]?.xdr ?? "", "base64").str()?.toString() ?? ""
         );
 
         const simV = await simulateRead(contractId, "get_votes", [xdr.ScVal.scvU32(i)]);
-        const v = xdr.ScVal.fromXDR(simV.results?.[0]?.retval ?? "", "base64").u32() ?? 0;
+        const v = xdr.ScVal.fromXDR(simV.results?.[0]?.xdr ?? "", "base64").u32() ?? 0;
         votes.push(v);
         total += v;
       }
@@ -237,7 +242,7 @@ function App() {
     try {
       const userScAddress = new Address(addr).toScVal();
       const sim = await simulateRead(contractId, "has_voted", [userScAddress]);
-      const voted = xdr.ScVal.fromXDR(sim.results?.[0]?.retval ?? "", "base64").b() ?? false;
+      const voted = xdr.ScVal.fromXDR(sim.results?.[0]?.xdr ?? "", "base64").b() ?? false;
       setHasVoted(voted);
     } catch {
       // ignore
