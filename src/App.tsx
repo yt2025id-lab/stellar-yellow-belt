@@ -55,11 +55,16 @@ async function simulateRead(contractId: string, method: string, args: xdr.ScVal[
 
 type TxStatus = "idle" | "pending" | "success" | "fail";
 
+interface SimulateHostFnResult {
+  auth: string[];
+  retval: string;
+}
+
 interface SimulateResult {
   transactionData: string;
   minResourceFee: string;
   events?: string[];
-  result?: { auth: string[]; retval: string };
+  results?: SimulateHostFnResult[];
 }
 
 interface PollData {
@@ -145,8 +150,8 @@ function App() {
   const checkPoll = useCallback(async () => {
     try {
       const sim = await simulateRead(contractId, "get_question");
-      if (sim.result?.retval) {
-        const questionScVal = xdr.ScVal.fromXDR(sim.result.retval, "base64");
+      if (sim.results?.[0]?.retval) {
+        const questionScVal = xdr.ScVal.fromXDR(sim.results[0].retval, "base64");
         const question = questionScVal.str()?.toString() ?? "";
         if (question) {
           setPollExists(true);
@@ -165,7 +170,7 @@ function App() {
     try {
       const simQ = await simulateRead(contractId, "get_question");
       const question =
-        xdr.ScVal.fromXDR(simQ.result?.retval ?? "", "base64").str()?.toString() ?? "";
+        xdr.ScVal.fromXDR(simQ.results?.[0]?.retval ?? "", "base64").str()?.toString() ?? "";
 
       const options: string[] = [];
       const votes: number[] = [];
@@ -174,11 +179,11 @@ function App() {
       for (let i = 0; i < 6; i++) {
         const simOpt = await simulateRead(contractId, "get_option", [xdr.ScVal.scvU32(i)]);
         options.push(
-          xdr.ScVal.fromXDR(simOpt.result?.retval ?? "", "base64").str()?.toString() ?? ""
+          xdr.ScVal.fromXDR(simOpt.results?.[0]?.retval ?? "", "base64").str()?.toString() ?? ""
         );
 
         const simV = await simulateRead(contractId, "get_votes", [xdr.ScVal.scvU32(i)]);
-        const v = xdr.ScVal.fromXDR(simV.result?.retval ?? "", "base64").u32() ?? 0;
+        const v = xdr.ScVal.fromXDR(simV.results?.[0]?.retval ?? "", "base64").u32() ?? 0;
         votes.push(v);
         total += v;
       }
@@ -232,7 +237,7 @@ function App() {
     try {
       const userScAddress = new Address(addr).toScVal();
       const sim = await simulateRead(contractId, "has_voted", [userScAddress]);
-      const voted = xdr.ScVal.fromXDR(sim.result?.retval ?? "", "base64").b() ?? false;
+      const voted = xdr.ScVal.fromXDR(sim.results?.[0]?.retval ?? "", "base64").b() ?? false;
       setHasVoted(voted);
     } catch {
       // ignore
@@ -505,8 +510,8 @@ function App() {
       if (!sim.transactionData) throw new Error("Simulation failed");
 
       const authXdr: xdr.SorobanAuthorizationEntry[] = [];
-      if (sim.result?.auth) {
-        for (const a of sim.result.auth) {
+      if (sim.results?.[0]?.auth) {
+        for (const a of sim.results[0].auth) {
           authXdr.push(xdr.SorobanAuthorizationEntry.fromXDR(a, "base64"));
         }
       }
