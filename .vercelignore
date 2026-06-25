@@ -1,0 +1,6 @@
+target/
+contracts/
+Cargo.toml
+Cargo.lock
+node_modules/
+.git/

@@ -108,7 +108,7 @@ test result: ok. 3 passed; 0 failed
 
 ## Live Demo
 
-https://livepoll.vercel.app
+https://stellar-yellow-belt-jade.vercel.app
 
 ## Screenshots
 
