@@ -494,6 +494,149 @@ body {
   margin-top: 4px;
 }
 
+/* ─── Wizard Form ─── */
+.form-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 380px;
+  width: 95vw;
+  background-color: #fff;
+  padding: 24px;
+  border-radius: 20px;
+  position: relative;
+  animation: modalIn 0.25s ease;
+}
+
+.wiz-title {
+  font-size: 26px;
+  color: #7c3aed;
+  font-weight: 700;
+  letter-spacing: -1px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-left: 28px;
+}
+
+.wiz-title::before,
+.wiz-title::after {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  left: 0;
+  background-color: #7c3aed;
+}
+
+.wiz-title::before {
+  width: 18px;
+  height: 18px;
+}
+
+.wiz-title::after {
+  width: 18px;
+  height: 18px;
+  animation: wizPulse 1s linear infinite;
+}
+
+@keyframes wizPulse {
+  from { transform: scale(0.9); opacity: 1; }
+  to { transform: scale(1.8); opacity: 0; }
+}
+
+.wiz-message {
+  color: rgba(88, 87, 87, 0.8);
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.wiz-group {
+  width: 100%;
+}
+
+.wiz-group label {
+  position: relative;
+  display: block;
+}
+
+.wiz-group label .input {
+  width: 100%;
+  padding: 12px 12px 18px 12px;
+  outline: 0;
+  border: 1px solid rgba(105, 105, 105, 0.4);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  background: #fff;
+  font-family: inherit;
+}
+
+.wiz-group label .input + span {
+  position: absolute;
+  left: 12px;
+  top: 14px;
+  color: #9ca3af;
+  font-size: 0.82rem;
+  cursor: text;
+  transition: 0.3s ease;
+  pointer-events: none;
+}
+
+.wiz-group label .input:focus + span,
+.wiz-group label .input:not(:placeholder-shown) + span {
+  top: -8px;
+  left: 10px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #7c3aed;
+  background: #fff;
+  padding: 0 4px;
+}
+
+.wiz-group label .input:valid + span {
+  color: #10b981;
+}
+
+.submit {
+  border: none;
+  outline: none;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  padding: 12px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.3s ease;
+}
+
+.submit:hover:not(:disabled) {
+  background: linear-gradient(135deg, #6d28d9, #9333ea);
+}
+
+.submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wiz-signin {
+  text-align: center;
+}
+
+.wiz-cancel {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wiz-cancel:hover {
+  color: #6b7280;
+  text-decoration: underline;
+}
+
 .btn-outline {
   padding: 6px 16px;
   border: 1px solid #e5e7eb;

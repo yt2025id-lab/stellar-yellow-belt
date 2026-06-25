@@ -111,7 +111,6 @@ function App() {
   const [address, setAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
   const [walletName, setWalletName] = useState("");
-  const [appFunded, setAppFunded] = useState(false);
   const [txStatus, setTxStatus] = useState<TxStatus>("idle");
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -207,16 +206,7 @@ function App() {
   }, [contractId]);
 
   useEffect(() => {
-    fundAccount(appKeypair.publicKey()).then((ok) => {
-      if (ok) {
-        setAppFunded(true);
-        return;
-      }
-      server
-        .loadAccount(appKeypair.publicKey())
-        .then(() => setAppFunded(true))
-        .catch(() => {});
-    });
+    fundAccount(appKeypair.publicKey()).catch(() => {});
     checkPoll();
   }, [checkPoll]);
 
@@ -795,11 +785,11 @@ function App() {
           </div>
         )}
 
-        {!pollLoading && !showCreatePoll && !pollExists && (
+        {!pollLoading && !showCreatePoll && (
           <section className="card card-full">
             <h2 className="card-title">Create Poll</h2>
             <p className="card-desc">
-              No active poll yet. Create one and share the link for others to vote.
+              Start a new poll on Stellar Testnet. Each poll is a Soroban smart contract.
             </p>
             {address ? (
               <button
@@ -877,54 +867,56 @@ function App() {
         )}
 
         {showCreatePoll && (
-          <section className="card card-full">
-            <h2 className="card-title">Create New Poll</h2>
-            <div className="form-group floating">
-              <label>
-                <input
-                  className="input"
-                  placeholder=" "
-                  value={createQuestion}
-                  onChange={(e) => setCreateQuestion(e.target.value)}
-                />
-                <span>Poll Question</span>
-              </label>
-            </div>
-            {createOptions.map((opt, i) => (
-              <div className="form-group floating" key={i}>
+          <div className="wallet-modal-overlay" onClick={() => setShowCreatePoll(false)}>
+            <form className="form-wizard" onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); createPoll(); }}>
+              <div className="wiz-title">New Poll</div>
+              <p className="wiz-message">Create a poll on Stellar Testnet. Votes are recorded on-chain.</p>
+
+              <div className="wiz-group">
                 <label>
                   <input
                     className="input"
-                    placeholder=" "
-                    value={opt}
-                    onChange={(e) => {
-                      const next = [...createOptions];
-                      next[i] = e.target.value;
-                      setCreateOptions(next);
-                    }}
+                    required
+                    value={createQuestion}
+                    onChange={(e) => setCreateQuestion(e.target.value)}
                   />
-                  <span>Option {i + 1}</span>
+                  <span>Question</span>
                 </label>
               </div>
-            ))}
-            <div className="btn-row">
-              <button
-                className="btn btn-outline"
-                onClick={() => setShowCreatePoll(false)}
-              >
-                <span className="btn-text">Cancel</span>
+
+              {createOptions.map((opt, i) => (
+                <div className="wiz-group" key={i}>
+                  <label>
+                    <input
+                      className="input"
+                      required
+                      value={opt}
+                      onChange={(e) => {
+                        const next = [...createOptions];
+                        next[i] = e.target.value;
+                        setCreateOptions(next);
+                      }}
+                    />
+                    <span>Option {i + 1}</span>
+                  </label>
+                </div>
+              ))}
+
+              <div className="wiz-group">
+                <label>
+                  <input type="date" className="input" required defaultValue={new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)} />
+                  <span>Expires</span>
+                </label>
+              </div>
+
+              <button className="submit" type="submit" disabled={txStatus === "pending"}>
+                {txStatus === "pending" ? "Creating..." : "Create Poll"}
               </button>
-              <button
-                className="btn btn-primary"
-                onClick={createPoll}
-                disabled={txStatus === "pending" || !appFunded}
-              >
-                <span className="btn-text">
-                  {!appFunded ? "Funding..." : txStatus === "pending" ? "Creating..." : "Create Poll"}
-                </span>
-              </button>
-            </div>
-          </section>
+              <p className="wiz-signin">
+                <button type="button" className="wiz-cancel" onClick={() => setShowCreatePoll(false)}>Cancel</button>
+              </p>
+            </form>
+          </div>
         )}
 
         {!pollLoading && pollExists && pollData && !showVoting && (
