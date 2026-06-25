@@ -584,14 +584,15 @@ body {
 }
 
 .wiz-group label .input:focus + span,
-.wiz-group label .input:not(:placeholder-shown) + span {
-  top: -8px;
+.wiz-group label .input:valid + span {
+  top: -10px;
   left: 10px;
   font-size: 0.65rem;
   font-weight: 700;
   color: #7c3aed;
   background: #fff;
-  padding: 0 4px;
+  padding: 0 5px;
+  z-index: 2;
 }
 
 .wiz-group label .input:valid + span {
