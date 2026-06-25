@@ -461,9 +461,11 @@ function App() {
         .setTimeout(300)
         .build();
 
-      const signedXdr = await signTransaction(tx.toXDR(), {
+      const signed = await signTransaction(tx.toXDR(), {
         networkPassphrase: Networks.TESTNET,
       });
+      const signedXdr = signed.signedTxXdr;
+      if (!signedXdr) throw new Error("Wallet signing failed");
 
       const send = (await rpcCall("sendTransaction", {
         transaction: signedXdr,
@@ -548,9 +550,11 @@ function App() {
         .setTimeout(300)
         .build();
 
-      const signedXdr = await signTransaction(tx.toXDR(), {
+      const signed = await signTransaction(tx.toXDR(), {
         networkPassphrase: Networks.TESTNET,
       });
+      const signedXdr = signed.signedTxXdr;
+      if (!signedXdr) throw new Error("Wallet signing failed");
 
       const send = (await rpcCall("sendTransaction", {
         transaction: signedXdr,
