@@ -3,6 +3,7 @@ import {
   isConnected,
   getAddress,
   requestAccess,
+  signTransaction,
 } from "@stellar/freighter-api";
 import {
   Horizon,
@@ -385,7 +386,7 @@ function App() {
     setSuccessMsg(null);
 
     try {
-      const acct = await server.loadAccount(appKeypair.publicKey());
+      const acct = await server.loadAccount(address);
       const contract = new Contract(contractId);
 
       const raw = new TransactionBuilder(acct, {
@@ -423,7 +424,7 @@ function App() {
         "base64"
       );
 
-      const fresh = await server.loadAccount(appKeypair.publicKey());
+      const fresh = await server.loadAccount(address);
       const tx = new TransactionBuilder(fresh, {
         fee,
         networkPassphrase: Networks.TESTNET,
@@ -447,10 +448,12 @@ function App() {
         .setTimeout(300)
         .build();
 
-      tx.sign(appKeypair);
+      const signedXdr = await signTransaction(tx.toXDR(), {
+        networkPassphrase: Networks.TESTNET,
+      });
 
       const send = (await rpcCall("sendTransaction", {
-        transaction: tx.toXDR(),
+        transaction: signedXdr,
       })) as unknown as { hash: string; status: string; errorResultXdr?: string };
 
       if (send.errorResultXdr) throw new Error(`TX failed: ${send.errorResultXdr}`);
@@ -478,20 +481,16 @@ function App() {
     setTxHash(null);
 
     try {
-      const acct = await server.loadAccount(appKeypair.publicKey());
+      const voterAcct = await server.loadAccount(address);
       const contract = new Contract(contractId);
       const voterScAddress = new Address(address).toScVal();
 
-      const raw = new TransactionBuilder(acct, {
+      const raw = new TransactionBuilder(voterAcct, {
         fee: "100000",
         networkPassphrase: Networks.TESTNET,
       })
         .addOperation(
-          contract.call(
-            "cast_vote",
-            voterScAddress,
-            xdr.ScVal.scvU32(optionId)
-          )
+          contract.call("cast_vote", voterScAddress, xdr.ScVal.scvU32(optionId))
         )
         .setTimeout(300)
         .build();
@@ -519,7 +518,7 @@ function App() {
         "base64"
       );
 
-      const fresh = await server.loadAccount(appKeypair.publicKey());
+      const fresh = await server.loadAccount(address);
       const tx = new TransactionBuilder(fresh, {
         fee,
         networkPassphrase: Networks.TESTNET,
@@ -536,10 +535,12 @@ function App() {
         .setTimeout(300)
         .build();
 
-      tx.sign(appKeypair);
+      const signedXdr = await signTransaction(tx.toXDR(), {
+        networkPassphrase: Networks.TESTNET,
+      });
 
       const send = (await rpcCall("sendTransaction", {
-        transaction: tx.toXDR(),
+        transaction: signedXdr,
       })) as unknown as { hash: string; status: string; errorResultXdr?: string };
 
       if (send.errorResultXdr) throw new Error(`TX failed: ${send.errorResultXdr}`);
@@ -549,6 +550,7 @@ function App() {
       setSuccessMsg(`Vote recorded for "${pollData?.options[optionId]}"!`);
       setHasVoted(true);
       setUserVotedOption(optionId);
+      await fetchBalance(address);
       await loadFullPoll();
       await fetchBalance(address);
     } catch (e: unknown) {
