@@ -90,12 +90,35 @@ test result: ok. 3 passed; 0 failed
 
 | Detail | Value |
 |--------|-------|
-| Contract ID | `(will be updated after deployment)` |
+| Contract ID | `CCSSUUVYZ5YS4HN74BKMGLEZR4S5NHBNY6JWYIBDRAJLI64RIH7KBS2W` |
 | Network | Stellar Testnet |
+| Explorer | [View on Stellar Lab](https://lab.stellar.org/r/testnet/contract/CCSSUUVYZ5YS4HN74BKMGLEZR4S5NHBNY6JWYIBDRAJLI64RIH7KBS2W) |
 | Functions | `init`, `cast_vote`, `get_question`, `get_option`, `get_votes`, `get_total_votes`, `get_results`, `has_voted` |
 | Events | `poll_created`, `vote_cast` |
+| WASM Hash | `4578e25f5e3f3fbfd03371d4152071abf90eab8ca2abf18734839429cf15410a` |
 
-## Contract Architecture
+## Transaction Hashes
+
+| Action | TX Hash | Explorer |
+|--------|---------|----------|
+| Contract Deploy | `ea4c1579855696a161ad88552cee239bd67fcdcb08b1b7ca7fd43e541dec6c08` | [View](https://stellar.expert/explorer/testnet/tx/ea4c1579855696a161ad88552cee239bd67fcdcb08b1b7ca7fd43e541dec6c08) |
+| WASM Upload | `f70d1dc0681dca8772f005ad12a2e6d671c4bea0d5fef7ff98ba1437f420e812` | [View](https://stellar.expert/explorer/testnet/tx/f70d1dc0681dca8772f005ad12a2e6d671c4bea0d5fef7ff98ba1437f420e812) |
+| Create Poll (`init`) | *(save from dApp after creating poll)* | [Stellar Expert](https://stellar.expert/explorer/testnet) |
+| Cast Vote (`cast_vote`) | *(save from dApp after voting)* | [Stellar Expert](https://stellar.expert/explorer/testnet) |
+
+## Live Demo
+
+https://livepoll.vercel.app
+
+## Screenshots
+
+| Screen | Description |
+|--------|-------------|
+| Wallet options modal | 4 wallets available (Freighter, Albedo, xBull, Rabet) |
+| Wallet connected + balance | Shows wallet name, address, XLM balance |
+| Poll created | Question + 6 options displayed with vote bars |
+| Vote success + TX hash | Transaction hash with link to Stellar Expert |
+| Error: already voted | Contract-level double-vote prevention |
 
 ### Storage
 
@@ -105,7 +128,7 @@ test result: ok. 3 passed; 0 failed
 | `opt0`–`opt5` | String | 6 option labels |
 | `votes0`–`votes5` | u32 | Vote count per option |
 | `total` | u32 | Total votes cast |
-| `v:<address>` | bool | Has voter already voted? |
+| Voter `Address` | bool | Has voter already voted? |
 
 ### Functions
 

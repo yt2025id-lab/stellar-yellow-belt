@@ -18,20 +18,13 @@ import {
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 const RPC_URL = "https://soroban-testnet.stellar.org";
 const CONTRACT_ID =
-  "CAIXY7P7RF5J2TTAI6BV4IUKAFXKJPUE2VSMM5F5IRHV7ARJ73JAAGSM";
+  "CCSSUUVYZ5YS4HN74BKMGLEZR4S5NHBNY6JWYIBDRAJLI64RIH7KBS2W";
 const POLL_CONTRACT_ID = ""; // diisi setelah deploy
 
 const server = new Horizon.Server(HORIZON_URL);
 const appKeypair = Keypair.random();
 
 type TxStatus = "idle" | "pending" | "success" | "fail";
-
-interface WalletOption {
-  id: string;
-  name: string;
-  icon: string;
-  available: boolean;
-}
 
 interface SimulateResult {
   transactionData: string;
@@ -102,6 +95,8 @@ function App() {
 
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [liveUpdated, setLiveUpdated] = useState(false);
+  const [view, setView] = useState<"landing" | "app">("landing");
+  const [showWalletModal, setShowWalletModal] = useState(false);
 
   const lastLedgerRef = useRef<number>(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -331,9 +326,7 @@ function App() {
       if (walletId === "freighter") {
         const { address: addr, error: e } = await requestAccess();
         if (e || !addr) {
-          setError(
-            "Error 1/3 — Wallet Not Found: Please install Freighter extension."
-          );
+          setError("Please install Freighter extension.");
           setTxStatus("fail");
           return;
         }
@@ -341,42 +334,66 @@ function App() {
         setWalletName("Freighter");
         await fetchBalance(addr);
       } else if (walletId === "albedo") {
+        const albedo = (window as unknown as Record<string, unknown>).albedo as
+          | { publicKey: () => Promise<{ pubkey: string }> }
+          | undefined;
+        if (!albedo) {
+          setError("Please install Albedo extension.");
+          setTxStatus("fail");
+          return;
+        }
         try {
-          const albedo = (window as unknown as Record<string, unknown>).albedo as
-            | { publicKey: () => Promise<{ pubkey: string }> }
-            | undefined;
-          if (!albedo) {
-            setError(
-              "Error 1/3 — Wallet Not Found: Please install Albedo extension."
-            );
-            setTxStatus("fail");
-            return;
-          }
           const { pubkey } = await albedo.publicKey();
           setAddress(pubkey);
           setWalletName("Albedo");
           await fetchBalance(pubkey);
         } catch {
-          setError(
-            "Error 2/3 — Transaction Rejected: User rejected in Albedo wallet."
-          );
+          setError("Albedo connection rejected by user.");
           setTxStatus("fail");
+          return;
         }
       } else if (walletId === "xbull") {
-        setError(
-          "xBull support requires xBull extension. Install from xbull.app"
-        );
-        setTxStatus("fail");
+        const xbull = (window as unknown as Record<string, unknown>).xBullSDK as
+          | { getPublicKey: () => Promise<string> }
+          | undefined;
+        if (!xbull) {
+          setError("Please install xBull extension from xbull.app");
+          setTxStatus("fail");
+          return;
+        }
+        try {
+          const pubkey = await xbull.getPublicKey();
+          setAddress(pubkey);
+          setWalletName("xBull");
+          await fetchBalance(pubkey);
+        } catch {
+          setError("xBull connection rejected by user.");
+          setTxStatus("fail");
+          return;
+        }
       } else if (walletId === "rabet") {
-        setError(
-          "Rabet support requires Rabet extension. Install from rabet.io"
-        );
-        setTxStatus("fail");
+        const rabet = (window as unknown as Record<string, unknown>).rabet as
+          | { connect: () => Promise<{ publicKey: string }> }
+          | undefined;
+        if (!rabet) {
+          setError("Please install Rabet extension from rabet.io");
+          setTxStatus("fail");
+          return;
+        }
+        try {
+          const { publicKey: pk } = await rabet.connect();
+          setAddress(pk);
+          setWalletName("Rabet");
+          await fetchBalance(pk);
+        } catch {
+          setError("Rabet connection rejected by user.");
+          setTxStatus("fail");
+          return;
+        }
       }
+      setShowWalletModal(false);
     } catch {
-      setError(
-        "Error 1/3 — Wallet Not Found: Please install wallet extension first."
-      );
+      setError("Wallet not found. Please install the wallet extension first.");
       setTxStatus("fail");
     }
   };
@@ -585,76 +602,230 @@ function App() {
 
   const formatAddr = (a: string) => `${a.slice(0, 6)}...${a.slice(-4)}`;
 
-  const wallets: WalletOption[] = [
-    { id: "freighter", name: "Freighter", icon: "🦊", available: true },
-    { id: "albedo", name: "Albedo", icon: "🌐", available: true },
-    { id: "xbull", name: "xBull", icon: "🐂", available: false },
-    { id: "rabet", name: "Rabet", icon: "🚀", available: false },
-  ];
-
   const BAR_COLORS = [
     "#7c3aed", "#06b6d4", "#f59e0b", "#ef4444", "#10b981", "#ec4899",
   ];
 
   return (
     <div className="container">
-      <header className="header">
-        <div className="logo">
-          <img src="/logoStellar.png" alt="Stellar" className="logo-img" />
-          <h1>Live Poll dApp</h1>
-        </div>
-        <p className="subtitle">
-          Yellow Belt &mdash; Stellar Journey to Mastery
-        </p>
-
-        {address ? (
-          <div className="wallet-bar">
-            <span className="badge">{walletName}</span>
-            <span className="address">{formatAddr(address)}</span>
-            <span className="badge-balance">
-              {balance
-                ? `${parseFloat(balance).toLocaleString(undefined, {
-                    maximumFractionDigits: 2,
-                  })} XLM`
-                : "..."}
-            </span>
-            <button className="btn btn-outline" onClick={disconnectWallet}>
-              <span className="btn-text">Disconnect</span>
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="wallet-options">
-              {wallets.map((w) => (
-                <button
-                  key={w.id}
-                  className={`btn ${
-                    w.id === "freighter" ? "btn-primary" : "btn-wallet"
-                  } ${!w.available ? "btn-disabled" : ""}`}
-                  onClick={() => connectWallet(w.id)}
-                  disabled={!w.available}
-                >
-                  <span className="btn-text">
-                    {w.icon} {w.name}
-                  </span>
-                </button>
-              ))}
+      {view === "landing" ? (
+        <div className="landing">
+          <div className="uiverse-midnight-sky">
+            <div className="sky-canvas">
+              <div className="stars stars-1" />
+              <div className="stars stars-2" />
+              <div className="stars stars-3" />
+              <div className="meteor m1" />
+              <div className="meteor m2" />
+              <div className="meteor m3" />
+              <div className="moon" />
             </div>
-            <p className="wallet-hint">Connect wallet to vote (Freighter recommended)</p>
-          </>
-        )}
-      </header>
+          </div>
+
+          <header className="landing-header">
+            <img src="/logo-livepoll.png" alt="LivePoll" className="landing-logo" />
+            <div className="logo-text">
+              <span className="logo-name">LivePoll</span>
+              <span className="logo-tagline">Decentralized Voting Protocol</span>
+            </div>
+          </header>
+
+          <section className="landing-hero">
+            <div className="hero-badge">
+              <span className="hero-badge-dot" />
+              Stellar Testnet
+            </div>
+
+            <div className="loader">
+              <div className="loader__bar" />
+              <div className="loader__bar" />
+              <div className="loader__bar" />
+              <div className="loader__bar" />
+              <div className="loader__bar" />
+              <div className="loader__ball" />
+            </div>
+
+            <h2 className="hero-title">
+              Every vote is a transaction.
+              <br />
+              Every result is verifiable.
+            </h2>
+            <p className="hero-desc">
+              A decentralized voting protocol on Stellar. Polls live in Soroban
+              contract storage. Votes are signed by your wallet and written to
+              the ledger. Results stream directly from on-chain events.
+            </p>
+            <button className="btn btn-hero" onClick={() => setView("app")}>
+              Launch dApp
+            </button>
+          </section>
+
+          <section className="landing-features">
+            <div className="feature-card">
+              <h3>On-Chain Voting</h3>
+              <p>
+                Each vote writes to Soroban instance storage. The tally is
+                public, anyone can verify it independently on Stellar Testnet.
+              </p>
+            </div>
+            <div className="feature-card">
+              <h3>Live Event Stream</h3>
+              <p>
+                The contract fires a <code>vote_cast</code> event on every
+                ballot. The frontend subscribes and refreshes results as they
+                arrive.
+              </p>
+            </div>
+            <div className="feature-card">
+              <h3>One Wallet, One Vote</h3>
+              <p>
+                <code>require_auth</code> at the contract level ties each vote
+                to a wallet signature. Casting twice is rejected on-chain.
+              </p>
+            </div>
+          </section>
+
+          <section className="landing-tech">
+            <h3>Tech Stack</h3>
+            <div className="tech-tags">
+              <span>React 19</span>
+              <span>TypeScript</span>
+              <span>Soroban Rust</span>
+              <span>Stellar SDK v13</span>
+              <span>Freighter</span>
+              <span>Albedo</span>
+              <span>Testnet</span>
+            </div>
+            <p className="landing-program">
+              Built for{" "}
+              <a
+                href="https://www.risein.com/programs/stellar-journey-to-mastery-monthly-builder-challenges/tasks/submission/zLD7OI0BUvUusdOgS"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Stellar Journey to Mastery
+              </a>{" "}
+              by Rise In &mdash; Yellow Belt
+            </p>
+          </section>
+
+          <footer className="footer">
+            <p>
+              Live Poll &bull; Yellow Belt &bull; Stellar Journey to Mastery
+              &bull; June 2026
+            </p>
+          </footer>
+        </div>
+      ) : (
+        <>
+          <header className="header">
+            <button className="btn-back" onClick={() => setView("landing")}>
+              &larr; Back
+            </button>
+            <div className="logo">
+              <img src="/logo-livepoll.png" alt="Live Poll" className="logo-img" />
+              <div className="logo-text">
+                <span className="logo-name">LivePoll</span>
+                <span className="logo-tagline">Decentralized Voting Protocol</span>
+              </div>
+            </div>
+
+            {address ? (
+              <button className="btn btn-outline" onClick={disconnectWallet}>
+                Disconnect
+              </button>
+            ) : (
+              <button
+                className="btn-wallet btn-connect"
+                onClick={() => setShowWalletModal(true)}
+              >
+                Connect Wallet
+              </button>
+            )}
+          </header>
 
       <main className="main">
+        {address && (
+          <>
+            <div className="wallet-info-card card-full">
+              <div className="wallet-info-row">
+                <div className="wallet-info-item">
+                  <span className="wallet-info-label">Wallet</span>
+                  <span className="wallet-info-value">{walletName}</span>
+                </div>
+                <div className="wallet-info-item">
+                  <span className="wallet-info-label">Address</span>
+                  <span className="wallet-info-value mono">{formatAddr(address)}</span>
+                </div>
+                <div className="wallet-info-item">
+                  <span className="wallet-info-label">Balance</span>
+                  <span className="wallet-info-value highlight">
+                    {balance
+                      ? `${parseFloat(balance).toLocaleString(undefined, { maximumFractionDigits: 2 })} XLM`
+                      : "..."}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="guide-card card-full">
+              <h3 className="guide-title">How it works</h3>
+              <div className="guide-steps">
+                <div className="guide-step">
+                  <span className="guide-num">1</span>
+                  <div>
+                    <strong>Create a poll</strong>
+                    <p>
+                      Click + Create Poll, set a question and up to six options.
+                      The poll is stored on-chain via the Soroban contract.
+                    </p>
+                  </div>
+                </div>
+                <div className="guide-step">
+                  <span className="guide-num">2</span>
+                  <div>
+                    <strong>Share the link</strong>
+                    <p>
+                      Anyone with a funded Stellar Testnet wallet can visit and
+                      vote. No sign-up, no permissions.
+                    </p>
+                  </div>
+                </div>
+                <div className="guide-step">
+                  <span className="guide-num">3</span>
+                  <div>
+                    <strong>Cast a vote</strong>
+                    <p>
+                      Click an option, sign the transaction in your wallet.
+                      Each vote costs a fraction of XLM in gas.
+                    </p>
+                  </div>
+                </div>
+                <div className="guide-step">
+                  <span className="guide-num">4</span>
+                  <div>
+                    <strong>Watch it update</strong>
+                    <p>
+                      Results refresh automatically as votes come in. The
+                      contract prevents double voting. Every transaction is
+                      verifiable on Stellar Expert.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
         {pollLoading && (
-          <div className="center-card">
+          <div className="center-card card-full">
             <div className="loader" />
             <p>Loading poll data...</p>
           </div>
         )}
 
         {!pollLoading && !pollExists && !showCreatePoll && (
-          <section className="card">
+          <section className="card card-full">
             <h2 className="card-title">No Active Poll</h2>
             <p className="card-desc">
               Create a new poll to get started. You&apos;ll be the first voter!
@@ -673,7 +844,7 @@ function App() {
         )}
 
         {showCreatePoll && (
-          <section className="card">
+          <section className="card card-full">
             <h2 className="card-title">Create New Poll</h2>
             <div className="form-group floating">
               <label>
@@ -833,12 +1004,62 @@ function App() {
         )}
       </main>
 
+      {showWalletModal && (
+        <div className="wallet-modal-overlay" onClick={() => setShowWalletModal(false)}>
+          <div className="wallet-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="wallet-modal-header">
+              <h3>Connect a Wallet</h3>
+              <button
+                className="wallet-modal-close"
+                onClick={() => setShowWalletModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+            <div className="wallet-modal-list">
+              <button
+                className="wallet-modal-item"
+                onClick={() => connectWallet("freighter")}
+              >
+                <span className="wallet-modal-icon">
+                  <img src="/logoStellar.png" alt="" className="wallet-modal-logo" />
+                </span>
+                <span className="wallet-modal-name">Freighter</span>
+              </button>
+              <button
+                className="wallet-modal-item"
+                onClick={() => connectWallet("albedo")}
+              >
+                <span className="wallet-modal-icon">A</span>
+                <span className="wallet-modal-name">Albedo</span>
+              </button>
+              <button
+                className="wallet-modal-item"
+                onClick={() => connectWallet("xbull")}
+              >
+                <span className="wallet-modal-icon">X</span>
+                <span className="wallet-modal-name">xBull</span>
+              </button>
+              <button
+                className="wallet-modal-item"
+                onClick={() => connectWallet("rabet")}
+              >
+                <span className="wallet-modal-icon">R</span>
+                <span className="wallet-modal-name">Rabet</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <footer className="footer">
         <p>
           Live Poll &bull; Yellow Belt &bull; Stellar Journey to Mastery &bull;
           June 2026
         </p>
       </footer>
+        </>
+      )}
     </div>
   );
 }
