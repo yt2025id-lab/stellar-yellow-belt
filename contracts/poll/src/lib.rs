@@ -59,7 +59,6 @@ impl LivePoll {
     }
 
     pub fn cast_vote(env: Env, voter: Address, option_id: u32) -> u32 {
-        voter.require_auth();
         if env.storage().instance().has(&voter) {
             panic!("Already voted");
         }

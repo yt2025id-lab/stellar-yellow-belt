@@ -3,7 +3,6 @@ import {
   isConnected,
   getAddress,
   requestAccess,
-  signTransaction,
 } from "@stellar/freighter-api";
 import {
   Horizon,
@@ -19,7 +18,7 @@ import {
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 const RPC_URL = "https://soroban-testnet.stellar.org";
 const CONTRACT_ID =
-  "CCSSUUVYZ5YS4HN74BKMGLEZR4S5NHBNY6JWYIBDRAJLI64RIH7KBS2W";
+  "CD2PMSUKGEXLWVT2XYN4J3KICLYPLDYABW3CRJXPVQE4ITJB42FY4OIN";
 const POLL_CONTRACT_ID = ""; // diisi setelah deploy
 
 const server = new Horizon.Server(HORIZON_URL);
@@ -399,7 +398,7 @@ function App() {
     setSuccessMsg(null);
 
     try {
-      const acct = await server.loadAccount(address);
+      const acct = await server.loadAccount(appKeypair.publicKey());
       const contract = new Contract(contractId);
 
       const raw = new TransactionBuilder(acct, {
@@ -437,7 +436,7 @@ function App() {
         "base64"
       );
 
-      const fresh = await server.loadAccount(address);
+      const fresh = await server.loadAccount(appKeypair.publicKey());
       const tx = new TransactionBuilder(fresh, {
         fee,
         networkPassphrase: Networks.TESTNET,
@@ -461,14 +460,10 @@ function App() {
         .setTimeout(300)
         .build();
 
-      const signed = await signTransaction(tx.toXDR(), {
-        networkPassphrase: Networks.TESTNET,
-      });
-      const signedXdr = signed.signedTxXdr;
-      if (!signedXdr) throw new Error("Wallet signing failed");
+      tx.sign(appKeypair);
 
       const send = (await rpcCall("sendTransaction", {
-        transaction: signedXdr,
+        transaction: tx.toXDR(),
       })) as unknown as { hash: string; status: string; errorResultXdr?: string };
 
       if (send.errorResultXdr) throw new Error(`TX failed: ${send.errorResultXdr}`);
@@ -496,11 +491,11 @@ function App() {
     setTxHash(null);
 
     try {
-      const voterAcct = await server.loadAccount(address);
+      const acct = await server.loadAccount(appKeypair.publicKey());
       const contract = new Contract(contractId);
       const voterScAddress = new Address(address).toScVal();
 
-      const raw = new TransactionBuilder(voterAcct, {
+      const raw = new TransactionBuilder(acct, {
         fee: "100000",
         networkPassphrase: Networks.TESTNET,
       })
@@ -516,13 +511,6 @@ function App() {
 
       if (!sim.transactionData) throw new Error("Simulation failed");
 
-      const authXdr: xdr.SorobanAuthorizationEntry[] = [];
-      if (sim.results?.[0]?.auth) {
-        for (const a of sim.results[0].auth) {
-          authXdr.push(xdr.SorobanAuthorizationEntry.fromXDR(a, "base64"));
-        }
-      }
-
       const fee = (
         (parseInt(raw.fee, 10) || 0) +
         (parseInt(String(sim.minResourceFee), 10) || 0)
@@ -533,7 +521,7 @@ function App() {
         "base64"
       );
 
-      const fresh = await server.loadAccount(address);
+      const fresh = await server.loadAccount(appKeypair.publicKey());
       const tx = new TransactionBuilder(fresh, {
         fee,
         networkPassphrase: Networks.TESTNET,
@@ -544,20 +532,15 @@ function App() {
             contract: contractId,
             function: "cast_vote",
             args: [voterScAddress, xdr.ScVal.scvU32(optionId)],
-            auth: authXdr.length > 0 ? authXdr : undefined,
           })
         )
         .setTimeout(300)
         .build();
 
-      const signed = await signTransaction(tx.toXDR(), {
-        networkPassphrase: Networks.TESTNET,
-      });
-      const signedXdr = signed.signedTxXdr;
-      if (!signedXdr) throw new Error("Wallet signing failed");
+      tx.sign(appKeypair);
 
       const send = (await rpcCall("sendTransaction", {
-        transaction: signedXdr,
+        transaction: tx.toXDR(),
       })) as unknown as { hash: string; status: string; errorResultXdr?: string };
 
       if (send.errorResultXdr) throw new Error(`TX failed: ${send.errorResultXdr}`);
