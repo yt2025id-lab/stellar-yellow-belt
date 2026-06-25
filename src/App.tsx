@@ -583,10 +583,6 @@ function App() {
 
   const formatAddr = (a: string) => `${a.slice(0, 6)}...${a.slice(-4)}`;
 
-  const BAR_COLORS = [
-    "#7c3aed", "#06b6d4", "#f59e0b", "#ef4444", "#10b981", "#ec4899",
-  ];
-
   return (
     <div className="container">
       {view === "landing" ? (
@@ -935,11 +931,12 @@ function App() {
                   pollData.total > 0
                     ? Math.round((pollData.votes[i] / pollData.total) * 100)
                     : 0;
+                const letters = ["A", "B", "C", "D", "E", "F"];
                 return (
                   <button
                     key={i}
-                    className={`option-bar ${
-                      userVotedOption === i ? "voted" : ""
+                    className={`option-card ${
+                      userVotedOption === i ? "voted-option" : ""
                     } ${hasVoted ? "disabled" : ""} ${
                       selectedOption === i && txStatus === "pending"
                         ? "selected"
@@ -948,18 +945,24 @@ function App() {
                     onClick={() => castVote(i)}
                     disabled={hasVoted || !address || txStatus === "pending"}
                   >
-                    <div className="option-bar-inner">
-                      <div
-                        className="option-fill"
-                        style={{
-                          width: `${pct}%`,
-                          backgroundColor: BAR_COLORS[i],
-                        }}
-                      />
+                    <span className="option-letter">{letters[i]}</span>
+                    <div className="option-info">
                       <span className="option-label">{opt}</span>
-                      <span className="option-votes">
-                        {pollData.votes[i]} vote{pollData.votes[i] !== 1 ? "s" : ""} ({pct}%)
+                      <div className="progress-track">
+                        <div
+                          className={`progress-fill ${pct === 0 ? "zero" : ""}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="option-stats">
+                      <span className="vote-count">
+                        {pollData.votes[i]}
                       </span>
+                      <span className="vote-pct">{pct}%</span>
+                      {userVotedOption === i && (
+                        <span className="vote-check">Voted</span>
+                      )}
                     </div>
                   </button>
                 );
