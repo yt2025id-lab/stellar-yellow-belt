@@ -13,6 +13,7 @@ import {
   Keypair,
   Operation,
   Address,
+  Account,
 } from "stellar-sdk";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
@@ -22,7 +23,32 @@ const CONTRACT_ID =
 const POLL_CONTRACT_ID = ""; // diisi setelah deploy
 
 const server = new Horizon.Server(HORIZON_URL);
-const appKeypair = Keypair.random();
+
+function getAppKeypair(): Keypair {
+  const stored = localStorage.getItem("livepoll_keypair");
+  if (stored) return Keypair.fromSecret(stored);
+  const kp = Keypair.random();
+  localStorage.setItem("livepoll_keypair", kp.secret());
+  return kp;
+}
+
+const appKeypair = getAppKeypair();
+
+async function simulateRead(contractId: string, method: string, args: xdr.ScVal[] = []) {
+  const contract = new Contract(contractId);
+  const tx = new TransactionBuilder(
+    new Account(appKeypair.publicKey(), "0"),
+    { fee: "100000", networkPassphrase: Networks.TESTNET }
+  )
+    .addOperation(contract.call(method, ...args))
+    .setTimeout(300)
+    .build();
+
+  const sim = await rpcCall("simulateTransaction", {
+    transaction: tx.toXDR(),
+  }) as unknown as SimulateResult;
+  return sim;
+}
 
 type TxStatus = "idle" | "pending" | "success" | "fail";
 
@@ -115,18 +141,7 @@ function App() {
 
   const checkPoll = useCallback(async () => {
     try {
-      const contract = new Contract(contractId);
-      const sim = (await rpcCall("simulateTransaction", {
-        transaction: new TransactionBuilder(
-          await server.loadAccount(appKeypair.publicKey()),
-          { fee: "100000", networkPassphrase: Networks.TESTNET }
-        )
-          .addOperation(contract.call("get_question"))
-          .setTimeout(300)
-          .build()
-          .toXDR(),
-      })) as unknown as { result?: { retval: string } };
-
+      const sim = await simulateRead(contractId, "get_question");
       if (sim.result?.retval) {
         const questionScVal = xdr.ScVal.fromXDR(sim.result.retval, "base64");
         const question = questionScVal.str()?.toString() ?? "";
@@ -145,20 +160,7 @@ function App() {
 
   const loadFullPoll = useCallback(async () => {
     try {
-      const acct = await server.loadAccount(appKeypair.publicKey());
-      const contract = new Contract(contractId);
-
-      const simQ = (await rpcCall("simulateTransaction", {
-        transaction: new TransactionBuilder(acct, {
-          fee: "100000",
-          networkPassphrase: Networks.TESTNET,
-        })
-          .addOperation(contract.call("get_question"))
-          .setTimeout(300)
-          .build()
-          .toXDR(),
-      })) as unknown as { result?: { retval: string } };
-
+      const simQ = await simulateRead(contractId, "get_question");
       const question =
         xdr.ScVal.fromXDR(simQ.result?.retval ?? "", "base64").str()?.toString() ?? "";
 
@@ -167,32 +169,12 @@ function App() {
       let total = 0;
 
       for (let i = 0; i < 6; i++) {
-        const simOpt = (await rpcCall("simulateTransaction", {
-          transaction: new TransactionBuilder(acct, {
-            fee: "100000",
-            networkPassphrase: Networks.TESTNET,
-          })
-            .addOperation(
-              contract.call("get_option", xdr.ScVal.scvU32(i))
-            )
-            .setTimeout(300)
-            .build()
-            .toXDR(),
-        })) as unknown as { result?: { retval: string } };
+        const simOpt = await simulateRead(contractId, "get_option", [xdr.ScVal.scvU32(i)]);
         options.push(
           xdr.ScVal.fromXDR(simOpt.result?.retval ?? "", "base64").str()?.toString() ?? ""
         );
 
-        const simV = (await rpcCall("simulateTransaction", {
-          transaction: new TransactionBuilder(acct, {
-            fee: "100000",
-            networkPassphrase: Networks.TESTNET,
-          })
-            .addOperation(contract.call("get_votes", xdr.ScVal.scvU32(i)))
-            .setTimeout(300)
-            .build()
-            .toXDR(),
-        })) as unknown as { result?: { retval: string } };
+        const simV = await simulateRead(contractId, "get_votes", [xdr.ScVal.scvU32(i)]);
         const v = xdr.ScVal.fromXDR(simV.result?.retval ?? "", "base64").u32() ?? 0;
         votes.push(v);
         total += v;
@@ -209,17 +191,14 @@ function App() {
     fundAccount(appKeypair.publicKey()).then((ok) => {
       if (ok) {
         setAppFunded(true);
-        checkPoll();
         return;
       }
       server
         .loadAccount(appKeypair.publicKey())
-        .then(() => {
-          setAppFunded(true);
-          checkPoll();
-        })
-        .catch(() => setPollLoading(false));
+        .then(() => setAppFunded(true))
+        .catch(() => {});
     });
+    checkPoll();
   }, [checkPoll]);
 
   useEffect(() => {
@@ -248,21 +227,8 @@ function App() {
 
   const checkHasVoted = async (addr: string) => {
     try {
-      const acct = await server.loadAccount(appKeypair.publicKey());
-      const contract = new Contract(contractId);
       const userScAddress = new Address(addr).toScVal();
-
-      const sim = (await rpcCall("simulateTransaction", {
-        transaction: new TransactionBuilder(acct, {
-          fee: "100000",
-          networkPassphrase: Networks.TESTNET,
-        })
-          .addOperation(contract.call("has_voted", userScAddress))
-          .setTimeout(300)
-          .build()
-          .toXDR(),
-      })) as unknown as { result?: { retval: string } };
-
+      const sim = await simulateRead(contractId, "has_voted", [userScAddress]);
       const voted = xdr.ScVal.fromXDR(sim.result?.retval ?? "", "base64").b() ?? false;
       setHasVoted(voted);
     } catch {
