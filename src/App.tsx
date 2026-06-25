@@ -131,7 +131,14 @@ function App() {
 
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [liveUpdated, setLiveUpdated] = useState(false);
-  const [view, setView] = useState<"landing" | "app">("landing");
+  const [view, setView] = useState<"landing" | "app">(() => {
+    return (localStorage.getItem("livepoll_view") as "landing" | "app") || "landing";
+  });
+
+  const switchView = (v: "landing" | "app") => {
+    localStorage.setItem("livepoll_view", v);
+    setView(v);
+  };
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [showVoting, setShowVoting] = useState(false);
 
@@ -619,7 +626,7 @@ function App() {
               contract storage. Votes are signed by your wallet and written to
               the ledger. Results stream directly from on-chain events.
             </p>
-            <button className="btn btn-hero" onClick={() => setView("app")}>
+            <button className="btn btn-hero" onClick={() => switchView("app")}>
               Launch dApp
             </button>
           </section>
@@ -683,7 +690,7 @@ function App() {
       ) : (
         <>
           <header className="header">
-            <button className="btn-back" onClick={() => setView("landing")}>
+            <button className="btn-back" onClick={() => switchView("landing")}>
               &larr; Back
             </button>
             <div className="logo">
@@ -788,11 +795,11 @@ function App() {
           </div>
         )}
 
-        {!pollLoading && !pollExists && !showCreatePoll && (
+        {!pollLoading && !showCreatePoll && !pollExists && (
           <section className="card card-full">
-            <h2 className="card-title">No Active Poll</h2>
+            <h2 className="card-title">Create Poll</h2>
             <p className="card-desc">
-              Create a new poll to get started. You&apos;ll be the first voter!
+              No active poll yet. Create one and share the link for others to vote.
             </p>
             {address ? (
               <button
@@ -805,6 +812,68 @@ function App() {
               <p className="info-hint">Connect wallet first to create a poll.</p>
             )}
           </section>
+        )}
+
+        {!pollLoading && pollExists && pollData && !showVoting && (
+          <>
+            <div className="poll-stats-row">
+              <div className="poll-stat-box">
+                <span className="poll-stat-num">1</span>
+                <span className="poll-stat-lbl">Active Poll</span>
+              </div>
+              <div className="poll-stat-box">
+                <span className="poll-stat-num">{pollData.total}</span>
+                <span className="poll-stat-lbl">Total Votes</span>
+              </div>
+              <div className="poll-stat-box">
+                <span className="poll-stat-num">{pollData.options.length}</span>
+                <span className="poll-stat-lbl">Options</span>
+              </div>
+            </div>
+
+            <section className="card card-full poll-summary">
+              <div className="poll-summary-header">
+                <div className="poll-live-badge">
+                  <span className="poll-live-dot" />
+                  Active
+                </div>
+                <h2 className="poll-question-title">{pollData.question}</h2>
+                <p className="poll-id-text">
+                  {contractId.slice(0, 8)}...{contractId.slice(-4)}
+                </p>
+              </div>
+
+              <div className="poll-summary-stats">
+                <div className="poll-stat">
+                  <span className="poll-stat-value">{pollData.total}</span>
+                  <span className="poll-stat-label">Total Votes</span>
+                </div>
+                <div className="poll-stat">
+                  <span className="poll-stat-value">{pollData.options.length}</span>
+                  <span className="poll-stat-label">Options</span>
+                </div>
+              </div>
+
+              <div className="poll-summary-detail">
+                <span className="poll-detail-text">
+                  Vote on-chain via Soroban contract. Results update live.
+                </span>
+              </div>
+
+              <div className="poll-summary-actions">
+                {address ? (
+                  <button
+                    className="btn btn-primary btn-full"
+                    onClick={() => setShowVoting(true)}
+                  >
+                    Vote Now
+                  </button>
+                ) : (
+                  <p className="info-hint">Connect wallet to vote</p>
+                )}
+              </div>
+            </section>
+          </>
         )}
 
         {showCreatePoll && (

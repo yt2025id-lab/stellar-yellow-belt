@@ -435,6 +435,65 @@ body {
 
 /* ─── Old Connected Bar (deprecated) ─── */
 
+.poll-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.poll-stat-box {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 16px 12px;
+  text-align: center;
+}
+
+.poll-stat-num {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #7c3aed;
+  display: block;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.poll-stat-lbl {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+}
+
+.poll-id-text {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.6rem;
+  color: #9ca3af;
+  margin-top: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.poll-summary-detail {
+  margin-bottom: 20px;
+  padding: 10px 0;
+  border-left: 3px solid #7c3aed;
+  padding-left: 12px;
+  text-align: left;
+}
+
+.poll-detail-text {
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.poll-summary-actions {
+  margin-top: 4px;
+}
+
 .btn-outline {
   padding: 6px 16px;
   border: 1px solid #e5e7eb;
