@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, Env, Symbol, Vec, String, Address};
+use soroban_sdk::{contract, contractimpl, Env, Symbol, Vec, String, Address, Map};
 
 const OPTIONS: u32 = 6;
 
@@ -45,9 +45,6 @@ impl LivePoll {
         opt4: String,
         opt5: String,
     ) {
-        if env.storage().instance().has(&key_question(&env)) {
-            panic!("Poll already initialized");
-        }
         env.storage().instance().set(&key_question(&env), &question);
         env.storage().instance().set(&key_option(&env, 0), &opt0);
         env.storage().instance().set(&key_option(&env, 1), &opt1);
@@ -56,10 +53,16 @@ impl LivePoll {
         env.storage().instance().set(&key_option(&env, 4), &opt4);
         env.storage().instance().set(&key_option(&env, 5), &opt5);
         env.storage().instance().set(&key_total(&env), &0u32);
+        for i in 0..OPTIONS {
+            env.storage().instance().set(&key_votes(&env, i), &0u32);
+        }
+        env.storage().instance().set(&Symbol::new(&env, "voters"), &Map::<Address, bool>::new(&env));
     }
 
     pub fn cast_vote(env: Env, voter: Address, option_id: u32) -> u32 {
-        if env.storage().instance().has(&voter) {
+        let voter_key = Symbol::new(&env, "voters");
+        let mut voters: Map<Address, bool> = env.storage().instance().get(&voter_key).unwrap_or(Map::new(&env));
+        if voters.contains_key(voter.clone()) {
             panic!("Already voted");
         }
         if option_id >= OPTIONS {
@@ -73,7 +76,8 @@ impl LivePoll {
         let total: u32 = env.storage().instance().get(&key_total(&env)).unwrap_or(0);
         env.storage().instance().set(&key_total(&env), &(total + 1));
 
-        env.storage().instance().set(&voter, &true);
+        voters.set(voter, true);
+        env.storage().instance().set(&voter_key, &voters);
 
         current + 1
     }
@@ -120,7 +124,8 @@ impl LivePoll {
     }
 
     pub fn has_voted(env: Env, voter: Address) -> bool {
-        env.storage().instance().has(&voter)
+        let voters: Map<Address, bool> = env.storage().instance().get(&Symbol::new(&env, "voters")).unwrap_or(Map::new(&env));
+        voters.contains_key(voter)
     }
 }
 

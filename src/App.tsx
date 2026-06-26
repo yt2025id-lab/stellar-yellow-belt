@@ -18,7 +18,7 @@ import {
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 const RPC_URL = "https://soroban-testnet.stellar.org";
 const CONTRACT_ID =
-  "CD2PMSUKGEXLWVT2XYN4J3KICLYPLDYABW3CRJXPVQE4ITJB42FY4OIN";
+  "CCJEQ6KIRJNQ4PLU2TUDESF4NBPGSPDW3JWO42OYGVI2XONDRFUJ6PDA";
 const POLL_CONTRACT_ID = ""; // diisi setelah deploy
 
 const server = new Horizon.Server(HORIZON_URL);
@@ -113,6 +113,18 @@ function App() {
   const [walletName, setWalletName] = useState("");
   const [txStatus, setTxStatus] = useState<TxStatus>("idle");
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [currentPollTxHash, setCurrentPollTxHash] = useState<string | null>(() => {
+    try { return localStorage.getItem("poll_create_tx_hash"); }
+    catch { return null; }
+  });
+  const [pollCreator, setPollCreator] = useState<string | null>(() => {
+    try { return localStorage.getItem("poll_creator"); }
+    catch { return null; }
+  });
+  const [recentVoteHashes, setRecentVoteHashes] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("poll_vote_hashes") || "[]"); }
+    catch { return []; }
+  });
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -127,6 +139,18 @@ function App() {
   const [createOptions, setCreateOptions] = useState([
     "Stellar", "Solana", "Ethereum", "Polygon", "Sui", "ICP",
   ]);
+
+  const [pollHistory, setPollHistory] = useState<{ data: PollData; timestamp: string; txHash?: string; voteHashes?: string[] }[]>(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("poll_history") || "[]");
+      return raw.map((item: unknown) => {
+        if (item && typeof item === "object" && "data" in (item as Record<string, unknown>))
+          return item as { data: PollData; timestamp: string; txHash?: string; voteHashes?: string[] };
+        const d = item as PollData;
+        return { data: d, timestamp: "—" };
+      });
+    } catch { return []; }
+  });
 
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [liveUpdated, setLiveUpdated] = useState(false);
@@ -381,6 +405,12 @@ function App() {
     setUserVotedOption(null);
     setTxStatus("idle");
     setTxHash(null);
+    setCurrentPollTxHash(null);
+    localStorage.removeItem("poll_create_tx_hash");
+    setPollCreator(null);
+    localStorage.removeItem("poll_creator");
+    setRecentVoteHashes([]);
+    localStorage.setItem("poll_vote_hashes", "[]");
     setError(null);
     setSuccessMsg(null);
     setShowVoting(false);
@@ -395,6 +425,23 @@ function App() {
     setSuccessMsg(null);
 
     try {
+      if (pollExists && pollData) {
+        const entry = {
+          data: { ...pollData },
+          timestamp: new Date().toISOString().replace("T", " ").slice(0, 19) + " GMT",
+          txHash: currentPollTxHash || undefined,
+          voteHashes: recentVoteHashes.length > 0 ? [...recentVoteHashes] : undefined,
+        };
+        const history = [...pollHistory, entry];
+        localStorage.setItem("poll_history", JSON.stringify(history));
+        setPollHistory(history);
+        setRecentVoteHashes([]);
+        localStorage.setItem("poll_vote_hashes", "[]");
+        setHasVoted(false);
+        setUserVotedOption(null);
+        setSelectedOption(null);
+      }
+
       const acct = await server.loadAccount(appKeypair.publicKey());
       const contract = new Contract(contractId);
 
@@ -466,6 +513,10 @@ function App() {
       if (send.errorResultXdr) throw new Error(`TX failed: ${send.errorResultXdr}`);
 
       setTxHash(send.hash);
+      setCurrentPollTxHash(send.hash);
+      localStorage.setItem("poll_create_tx_hash", send.hash);
+      setPollCreator(address);
+      localStorage.setItem("poll_creator", address);
       setTxStatus("success");
       setSuccessMsg("Poll created! Contract emits event: poll_created");
       setShowCreatePoll(false);
@@ -475,6 +526,32 @@ function App() {
       setTxStatus("fail");
       setError(`Error: ${(e as Error).message || "Create poll failed"}`);
     }
+  };
+
+  // ============ CLOSE POLL ============
+
+  const closePoll = () => {
+    if (!pollData || !pollExists) return;
+    const entry = {
+      data: { ...pollData },
+      timestamp: new Date().toISOString().replace("T", " ").slice(0, 19) + " GMT",
+      txHash: currentPollTxHash || undefined,
+      voteHashes: recentVoteHashes.length > 0 ? [...recentVoteHashes] : undefined,
+    };
+    const history = [...pollHistory, entry];
+    localStorage.setItem("poll_history", JSON.stringify(history));
+    setPollHistory(history);
+    setPollExists(false);
+    setPollData(null);
+    setCurrentPollTxHash(null);
+    localStorage.removeItem("poll_create_tx_hash");
+    setPollCreator(null);
+    localStorage.removeItem("poll_creator");
+    setRecentVoteHashes([]);
+    localStorage.setItem("poll_vote_hashes", "[]");
+    setHasVoted(false);
+    setUserVotedOption(null);
+    setSelectedOption(null);
   };
 
   // ============ VOTE ============
@@ -543,6 +620,11 @@ function App() {
       if (send.errorResultXdr) throw new Error(`TX failed: ${send.errorResultXdr}`);
 
       setTxHash(send.hash);
+      setRecentVoteHashes(prev => {
+        const next = [...prev, send.hash];
+        localStorage.setItem("poll_vote_hashes", JSON.stringify(next));
+        return next;
+      });
       setTxStatus("success");
       setSuccessMsg(`Vote recorded for "${pollData?.options[optionId]}"!`);
       setHasVoted(true);
@@ -561,6 +643,12 @@ function App() {
         setError(`Error: ${msg || "Vote failed"}`);
       }
     }
+  };
+
+  const deleteHistory = (idx: number) => {
+    const next = pollHistory.filter((_, i) => i !== idx);
+    localStorage.setItem("poll_history", JSON.stringify(next));
+    setPollHistory(next);
   };
 
   // ============ RENDER ============
@@ -805,65 +893,117 @@ function App() {
         )}
 
         {!pollLoading && pollExists && pollData && !showVoting && (
-          <>
-            <div className="poll-stats-row">
-              <div className="poll-stat-box">
-                <span className="poll-stat-num">1</span>
-                <span className="poll-stat-lbl">Active Poll</span>
-              </div>
-              <div className="poll-stat-box">
-                <span className="poll-stat-num">{pollData.total}</span>
-                <span className="poll-stat-lbl">Total Votes</span>
-              </div>
-              <div className="poll-stat-box">
-                <span className="poll-stat-num">{pollData.options.length}</span>
-                <span className="poll-stat-lbl">Options</span>
-              </div>
-            </div>
-
-            <section className="card card-full poll-summary">
-              <div className="poll-summary-header">
-                <div className="poll-live-badge">
-                  <span className="poll-live-dot" />
-                  Active
+          <div className="poll-history-grid">
+            {pollHistory.map((entry, idx) => {
+              const p = entry.data;
+              return (
+                <div key={idx} className="poll-summary-card poll-card-uniform">
+                  <div className="poll-summary-card-header history-header">
+                    <div className="poll-summary-card-badge history-badge">Closed</div>
+                    <button className="history-delete" onClick={() => deleteHistory(idx)} title="Hapus dari history">&times;</button>
+                    <h2 className="poll-summary-card-title">{p.question}</h2>
+                    <p className="poll-summary-card-id">{entry.timestamp}</p>
+                    {entry.txHash && (
+                      <p className="poll-summary-card-txhash">
+                        <span className="tx-label">Create Poll</span>
+                        <a href={`https://stellar.expert/explorer/testnet/tx/${entry.txHash}`} target="_blank" rel="noopener noreferrer" className="tx-link">
+                          {entry.txHash.slice(0, 10)}...{entry.txHash.slice(-6)}
+                        </a>
+                      </p>
+                    )}
+                  </div>
+                  <div className="poll-summary-card-info">
+                    <div className="poll-summary-card-stats">
+                      <div className="poll-summary-card-stat">
+                        <span className="poll-summary-card-stat-value">{p.total}</span>
+                        <span className="poll-summary-card-stat-label">Total Votes</span>
+                      </div>
+                      <div className="poll-summary-card-stat">
+                        <span className="poll-summary-card-stat-value">{p.options.length}</span>
+                        <span className="poll-summary-card-stat-label">Options</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="poll-summary-card-footer history-footer">
+                    <span className="poll-summary-card-tag">
+                      {p.options.map((_, i) => `${"ABCDEF"[i]}:${p.votes[i]}`).join("  ")}
+                    </span>
+                    {entry.voteHashes && entry.voteHashes.length > 0 && (
+                      <div className="poll-summary-card-votes">
+                        <span className="vote-hash-label">Votes ({entry.voteHashes.length})</span>
+                        {entry.voteHashes.slice(-3).map((vh, vi) => (
+                          <a key={vi} href={`https://stellar.expert/explorer/testnet/tx/${vh}`} target="_blank" rel="noopener noreferrer" className="tx-link vote-link">
+                            {vh.slice(0, 8)}...{vh.slice(-4)}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <h2 className="poll-question-title">{pollData.question}</h2>
-                <p className="poll-id-text">
+              );
+            })}
+            <div className="poll-summary-card poll-card-uniform">
+              <div className="poll-summary-card-header">
+                <div className="poll-summary-card-badge">
+                  <span className="poll-summary-card-dot" />
+                  Active Poll
+                </div>
+                <h2 className="poll-summary-card-title">{pollData.question}</h2>
+                <p className="poll-summary-card-id">
                   {contractId.slice(0, 8)}...{contractId.slice(-4)}
                 </p>
+                {currentPollTxHash && (
+                  <p className="poll-summary-card-txhash">
+                    <span className="tx-label">Create Poll</span>
+                    <a href={`https://stellar.expert/explorer/testnet/tx/${currentPollTxHash}`} target="_blank" rel="noopener noreferrer" className="tx-link">
+                      {currentPollTxHash.slice(0, 10)}...{currentPollTxHash.slice(-6)}
+                    </a>
+                  </p>
+                )}
               </div>
-
-              <div className="poll-summary-stats">
-                <div className="poll-stat">
-                  <span className="poll-stat-value">{pollData.total}</span>
-                  <span className="poll-stat-label">Total Votes</span>
+              <div className="poll-summary-card-info">
+                <div className="poll-summary-card-stats">
+                  <div className="poll-summary-card-stat">
+                    <span className="poll-summary-card-stat-value">{pollData.total}</span>
+                    <span className="poll-summary-card-stat-label">Total Votes</span>
+                  </div>
+                  <div className="poll-summary-card-stat">
+                    <span className="poll-summary-card-stat-value">{pollData.options.length}</span>
+                    <span className="poll-summary-card-stat-label">Options</span>
+                  </div>
                 </div>
-                <div className="poll-stat">
-                  <span className="poll-stat-value">{pollData.options.length}</span>
-                  <span className="poll-stat-label">Options</span>
-                </div>
+                {recentVoteHashes.length > 0 && (
+                  <div className="poll-summary-card-votes">
+                    <span className="vote-hash-label">Vote TX Hashes</span>
+                    {recentVoteHashes.slice(-3).map((vh, vi) => (
+                      <a key={vi} href={`https://stellar.expert/explorer/testnet/tx/${vh}`} target="_blank" rel="noopener noreferrer" className="tx-link vote-link">
+                        {vh.slice(0, 10)}...{vh.slice(-6)}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
-
-              <div className="poll-summary-detail">
-                <span className="poll-detail-text">
+              <div className="poll-summary-card-footer">
+                <span className="poll-summary-card-tag">
                   Vote on-chain via Soroban contract. Results update live.
                 </span>
-              </div>
-
-              <div className="poll-summary-actions">
+                <div className="poll-summary-card-footer-actions">
+                  {address === pollCreator && (
+                    <button className="poll-summary-card-close" onClick={closePoll}>
+                      Close Poll
+                    </button>
+                  )}
                 {address ? (
-                  <button
-                    className="btn btn-primary btn-full"
-                    onClick={() => setShowVoting(true)}
-                  >
+                  <button className="poll-summary-card-action" onClick={() => setShowVoting(true)}>
                     Vote Now
                   </button>
                 ) : (
                   <p className="info-hint">Connect wallet to vote</p>
                 )}
+                </div>
               </div>
-            </section>
-          </>
+            </div>
+          </div>
         )}
 
         {showCreatePoll && (
@@ -902,181 +1042,35 @@ function App() {
                 </div>
               ))}
 
-              <div className="wiz-group">
-                <label>
-                  <input type="date" className="input" required defaultValue={new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)} />
-                  <span>Expires</span>
-                </label>
-              </div>
-
               <button className="submit" type="submit" disabled={txStatus === "pending"}>
                 {txStatus === "pending" ? "Creating..." : "Create Poll"}
               </button>
+
+              {txStatus === "success" && successMsg && (
+                <div className="wiz-status success">
+                  <strong>&#10003; {successMsg}</strong>
+                  {txHash && (
+                    <a href={`https://stellar.expert/explorer/testnet/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="explorer-link">View on Stellar Expert &rarr;</a>
+                  )}
+                </div>
+              )}
+              {error && txStatus === "fail" && (
+                <div className="wiz-status error">
+                  <strong>&#10007; {error}</strong>
+                </div>
+              )}
+
               <p className="wiz-signin">
-                <button type="button" className="wiz-cancel" onClick={() => setShowCreatePoll(false)}>Cancel</button>
+                <button type="button" className="wiz-cancel" onClick={() => { setShowCreatePoll(false); setTxStatus("idle"); setError(null); setSuccessMsg(null); }}>Cancel</button>
               </p>
             </form>
           </div>
         )}
 
-        {!pollLoading && pollExists && pollData && !showVoting && (
-          <section className="card card-full poll-summary">
-            <div className="poll-summary-header">
-              <div className="poll-live-badge">
-                <span className="poll-live-dot" />
-                Active Poll
-              </div>
-              <h2 className="poll-question-title">{pollData.question}</h2>
-            </div>
 
-            <div className="poll-summary-stats">
-              <div className="poll-stat">
-                <span className="poll-stat-value">{pollData.total}</span>
-                <span className="poll-stat-label">Total Votes</span>
-              </div>
-              <div className="poll-stat">
-                <span className="poll-stat-value">{pollData.options.length}</span>
-                <span className="poll-stat-label">Options</span>
-              </div>
-            </div>
 
-            {address ? (
-              <button
-                className="btn btn-primary btn-full"
-                onClick={() => setShowVoting(true)}
-              >
-                Vote Now
-              </button>
-            ) : (
-              <p className="info-hint">Connect wallet to vote</p>
-            )}
-          </section>
-        )}
 
-        {!pollLoading && pollExists && pollData && showVoting && (
-          <>
-            <button
-              className="btn-back btn-back-poll"
-              onClick={() => setShowVoting(false)}
-            >
-              &larr; Back to Poll
-            </button>
 
-            <section className="card poll-card">
-            <div className="poll-header">
-              <h2 className="card-title">{pollData.question}</h2>
-              <div className="live-indicator">
-                <span className={`pulse-dot ${liveUpdated ? "pulse" : ""}`} />
-                <span className="live-text">
-                  {liveUpdated ? "Updated!" : "Live"}
-                </span>
-              </div>
-            </div>
-
-            <div className="options-list">
-              {pollData.options.map((opt, i) => {
-                const pct =
-                  pollData.total > 0
-                    ? Math.round((pollData.votes[i] / pollData.total) * 100)
-                    : 0;
-                const letters = ["A", "B", "C", "D", "E", "F"];
-                return (
-                  <button
-                    key={i}
-                    className={`option-card ${
-                      userVotedOption === i ? "voted-option" : ""
-                    } ${hasVoted ? "disabled" : ""} ${
-                      selectedOption === i && txStatus === "pending"
-                        ? "selected"
-                        : ""
-                    }`}
-                    onClick={() => castVote(i)}
-                    disabled={hasVoted || !address || txStatus === "pending"}
-                  >
-                    <span className="option-letter">{letters[i]}</span>
-                    <div className="option-info">
-                      <span className="option-label">{opt}</span>
-                      <div className="progress-track">
-                        <div
-                          className={`progress-fill ${pct === 0 ? "zero" : ""}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="option-stats">
-                      <span className="vote-count">
-                        {pollData.votes[i]}
-                      </span>
-                      <span className="vote-pct">{pct}%</span>
-                      {userVotedOption === i && (
-                        <span className="vote-check">Voted</span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="poll-footer">
-              <span className="total-votes">
-                Total: {pollData.total} vote{pollData.total !== 1 ? "s" : ""}
-              </span>
-              {hasVoted && (
-                <span className="voted-badge">
-                  You voted: {pollData.options[userVotedOption ?? 0]}
-                </span>
-              )}
-            </div>
-
-            {!address && (
-              <p className="info-hint">Connect wallet above to vote</p>
-            )}
-          </section>
-          </>
-        )}
-
-        {(txStatus !== "idle" || error || successMsg || txHash) && (
-          <section className="card status-section">
-            <h3 className="status-title">Transaction Status</h3>
-            <div className="tx-status-row">
-              <span className={`tx-badge ${txStatus}`}>
-                {txStatus === "idle" && "Ready"}
-                {txStatus === "pending" && "Pending..."}
-                {txStatus === "success" && "Success"}
-                {txStatus === "fail" && "Failed"}
-              </span>
-            </div>
-
-            {txStatus === "success" && successMsg && (
-              <div className="status-card success">
-                <strong>&#10003; {successMsg}</strong>
-                {txHash && (
-                  <a
-                    href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="explorer-link"
-                  >
-                    View on Stellar Expert &rarr;
-                  </a>
-                )}
-              </div>
-            )}
-
-            {error && txStatus === "fail" && (
-              <div className="status-card error">
-                <strong>&#10007; {error}</strong>
-              </div>
-            )}
-
-            <div className="error-types-info">
-              <p className="info-hint">
-                Error types handled: ① Wallet Not Found &bull; ② Transaction
-                Rejected &bull; ③ Already Voted
-              </p>
-            </div>
-          </section>
-        )}
       </main>
 
       {showWalletModal && (
@@ -1123,6 +1117,85 @@ function App() {
                 <span className="wallet-modal-name">Rabet</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showVoting && pollExists && pollData && (
+        <div className="wallet-modal-overlay" onClick={() => setShowVoting(false)}>
+          <div className="vote-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="vote-modal-header">
+              <div className="vote-modal-live">
+                <span className={`vote-modal-dot ${liveUpdated ? "pulse" : ""}`} />
+                {liveUpdated ? "Updated!" : "Live"}
+              </div>
+              <button className="vote-modal-close" onClick={() => setShowVoting(false)}>&times;</button>
+            </div>
+
+            <h2 className="vote-modal-title">{pollData.question}</h2>
+
+            <div className="vote-options-list">
+              {pollData.options.map((opt, i) => {
+                const pct =
+                  pollData.total > 0
+                    ? Math.round((pollData.votes[i] / pollData.total) * 100)
+                    : 0;
+                const letters = ["A", "B", "C", "D", "E", "F"];
+                return (
+                  <button
+                    key={i}
+                    className={`vote-option-btn ${
+                      userVotedOption === i ? "voted" : ""
+                    } ${hasVoted ? "disabled" : ""} ${
+                      selectedOption === i && txStatus === "pending" ? "selected" : ""
+                    }`}
+                    onClick={() => castVote(i)}
+                    disabled={hasVoted || !address || txStatus === "pending"}
+                  >
+                    <span className="vote-opt-letter">{letters[i]}</span>
+                    <div className="vote-opt-body">
+                      <div className="vote-opt-row">
+                        <span className="vote-opt-label">{opt}</span>
+                        <span className="vote-opt-pct">{pct}%</span>
+                      </div>
+                      <div className="vote-opt-track">
+                        <div className="vote-opt-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                    <div className="vote-opt-right">
+                      <span className="vote-opt-count">{pollData.votes[i]}</span>
+                      {userVotedOption === i && <span className="vote-opt-check">Voted</span>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="vote-modal-footer">
+              <span className="vote-modal-total">
+                Total: {pollData.total} vote{pollData.total !== 1 ? "s" : ""}
+              </span>
+              {hasVoted && (
+                <span className="vote-modal-voted">
+                  &#10003; You: {pollData.options[userVotedOption ?? 0]}
+                </span>
+              )}
+            </div>
+
+            {txStatus === "success" && successMsg && (
+              <div className="vote-modal-status success">
+                <strong>&#10003; {successMsg}</strong>
+                {txHash && (
+                  <a href={`https://stellar.expert/explorer/testnet/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="explorer-link">View on Stellar Expert &rarr;</a>
+                )}
+              </div>
+            )}
+
+            {error && txStatus === "fail" && selectedOption !== null && (
+              <div className="vote-modal-status error">
+                <strong>&#10007; {error}</strong>
+              </div>
+            )}
           </div>
         </div>
       )}
